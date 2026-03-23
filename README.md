@@ -54,7 +54,7 @@ Then restart the WebUI.
 
 ## Credits
 
-Algorithm ported from [cussam-sampler](https://github.com/cussam/cussam-sampler).
+Algorithm ported from [adept-sampler](https://github.com/nawka12/adept-sampler).
 
 ## License
 
