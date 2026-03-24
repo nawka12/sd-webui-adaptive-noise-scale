@@ -47,9 +47,10 @@ Samplers NOT supported (warning emitted):
 """
 
 import functools
+from functools import partial
 import torch
 import gradio as gr
-from modules import scripts
+from modules import scripts, script_callbacks
 from modules.shared import opts
 
 # Resolve which k-diffusion sampling module the current backend uses.
@@ -225,6 +226,16 @@ class AdaptiveNoiseScaleScript(scripts.Script):
         floor_val   = float(args[3]) if len(args) > 3 else 0.80
         ceiling_val = float(args[4]) if len(args) > 4 else 1.15
         use_binned  = bool(args[5])  if len(args) > 5 else True
+
+        # XYZ grid overrides
+        xyz = getattr(p, '_ans_xyz', {})
+        if xyz:
+            if 'enabled'    in xyz: enabled     = xyz['enabled']
+            if 'warmup'     in xyz: warmup      = xyz['warmup']
+            if 'power'      in xyz: power       = xyz['power']
+            if 'floor'      in xyz: floor_val   = xyz['floor']
+            if 'ceiling'    in xyz: ceiling_val = xyz['ceiling']
+            if 'use_binned' in xyz: use_binned  = xyz['use_binned']
 
         if not enabled:
             return
@@ -558,3 +569,81 @@ class AdaptiveNoiseScaleScript(scripts.Script):
             sampler.func = orig_fn
 
         self._state = {}
+
+
+# ---------------------------------------------------------------------------
+# XYZ grid integration
+# ---------------------------------------------------------------------------
+
+def _ans_set_value(p, x, xs, *, field):
+    """Setter called by the XYZ grid for each cell."""
+    if not hasattr(p, '_ans_xyz'):
+        p._ans_xyz = {}
+    try:
+        if field in ('enabled', 'use_binned'):
+            x = str(x).strip().lower() == 'true'
+        elif field == 'warmup':
+            x = int(x)
+        elif field in ('power', 'floor', 'ceiling'):
+            x = float(x)
+        p._ans_xyz[field] = x
+    except (ValueError, TypeError) as e:
+        print(f"[ANS] XYZ Grid: invalid value '{x}' for '{field}': {e}")
+
+
+def _make_ans_axis_options():
+    xyz_grid = None
+    for sd in scripts.scripts_data:
+        if sd.script_class.__module__ == 'xyz_grid.py':
+            xyz_grid = sd.module
+            break
+    if xyz_grid is None:
+        return
+
+    axis = [
+        xyz_grid.AxisOption(
+            "(ANS) Enabled",
+            str,
+            partial(_ans_set_value, field='enabled'),
+            choices=lambda: ["True", "False"],
+        ),
+        xyz_grid.AxisOption(
+            "(ANS) Warmup Steps",
+            int,
+            partial(_ans_set_value, field='warmup'),
+        ),
+        xyz_grid.AxisOption(
+            "(ANS) Correction Power",
+            float,
+            partial(_ans_set_value, field='power'),
+        ),
+        xyz_grid.AxisOption(
+            "(ANS) Dampen Floor",
+            float,
+            partial(_ans_set_value, field='floor'),
+        ),
+        xyz_grid.AxisOption(
+            "(ANS) Boost Ceiling",
+            float,
+            partial(_ans_set_value, field='ceiling'),
+        ),
+        xyz_grid.AxisOption(
+            "(ANS) Phase-Binned Correction",
+            str,
+            partial(_ans_set_value, field='use_binned'),
+            choices=lambda: ["True", "False"],
+        ),
+    ]
+
+    if not any(getattr(o, 'label', '').startswith('(ANS)') for o in xyz_grid.axis_options):
+        xyz_grid.axis_options.extend(axis)
+
+
+def _on_before_ui():
+    try:
+        _make_ans_axis_options()
+    except Exception as e:
+        print(f"[ANS] XYZ grid registration failed: {e}")
+
+
+script_callbacks.on_before_ui(_on_before_ui)
