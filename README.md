@@ -1,6 +1,6 @@
 # sd-webui-adaptive-noise-scale
 
-A standalone extension for [stable-diffusion-webui-reForge](https://github.com/Panchovix/stable-diffusion-webui-reForge) and [WebUI Forge Neo](https://github.com/lllyasviel/stable-diffusion-webui-forge) that ports the Adaptive Noise Scale calibration algorithm from [adept-sampler](https://github.com/nawka12/adept-sampler) to work transparently with the built-in k-diffusion samplers.
+A standalone extension for [stable-diffusion-webui-reForge](https://github.com/Panchovix/stable-diffusion-webui-reForge) and [WebUI Forge Neo](https://github.com/Haoming02/sd-webui-forge-classic/tree/neo) that ports the Adaptive Noise Scale calibration algorithm from [adept-sampler](https://github.com/nawka12/adept-sampler) to work transparently with the built-in k-diffusion samplers.
 
 ## How it works
 
