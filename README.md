@@ -1,6 +1,6 @@
 # sd-webui-adaptive-noise-scale
 
-A standalone extension for [stable-diffusion-webui-reForge](https://github.com/Panchovix/stable-diffusion-webui-reForge) that ports the Adaptive Noise Scale calibration algorithm from [adept-sampler](https://github.com/nawka12/adept-sampler) to work transparently with reForge's built-in k-diffusion samplers.
+A standalone extension for [stable-diffusion-webui-reForge](https://github.com/Panchovix/stable-diffusion-webui-reForge) and [WebUI Forge Neo](https://github.com/lllyasviel/stable-diffusion-webui-forge) that ports the Adaptive Noise Scale calibration algorithm from [adept-sampler](https://github.com/nawka12/adept-sampler) to work transparently with the built-in k-diffusion samplers.
 
 ## How it works
 
@@ -28,7 +28,7 @@ Two-pass execution:
 
 ## Supported samplers
 
-Works with all standard reForge k-diffusion samplers: Euler a, DPM++ SDE, DPM++ 2M SDE, DPM++ 3M SDE, DPM++ 2S a, DPM2 a, DPM fast, DPM adaptive, Euler A2, and others that inject noise.
+Works with all standard k-diffusion samplers on both reForge and Forge Neo: Euler a, DPM++ SDE, DPM++ 2M SDE, DPM++ 3M SDE, DPM++ 2S a, DPM2 a, DPM fast, DPM adaptive, Euler A2, and others that inject noise.
 
 **Not supported (with warnings):**
 - **DPM++ 2M, LMS** — fully deterministic, no noise injection.
@@ -41,16 +41,20 @@ Works with all standard reForge k-diffusion samplers: Euler a, DPM++ SDE, DPM++ 
 Clone into your extensions folder:
 
 ```bash
+# reForge
 cd stable-diffusion-webui-reForge/extensions
+git clone https://github.com/nawka12/sd-webui-adaptive-noise-scale
+
+# Forge Neo
+cd stable-diffusion-webui-forge/extensions
 git clone https://github.com/nawka12/sd-webui-adaptive-noise-scale
 ```
 
 Then restart the WebUI.
 
-## Disclaimer
+## Compatibility
 
-> **This extension has been developed and tested exclusively on [stable-diffusion-webui-reForge](https://github.com/Panchovix/stable-diffusion-webui-reForge).**
-> It has not been tested on other WebUI forks such as AUTOMATIC1111, SD WebUI Forge, Forge Neo, ComfyUI, or any other variant. Compatibility with those environments is not guaranteed and no support is provided for them.
+Developed and tested on **reForge** and **Forge Neo**. Other forks (AUTOMATIC1111, ComfyUI, etc.) are not supported.
 
 ## Credits
 

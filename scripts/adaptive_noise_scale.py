@@ -54,12 +54,19 @@ from modules import scripts, script_callbacks
 from modules.shared import opts
 
 # Resolve which k-diffusion sampling module the current backend uses.
-if opts.sd_sampling == "A1111":
+# reForge exposes opts.sd_sampling to select the backend; Forge Neo does not
+# have this option and uses k_diffusion.sampling directly.
+_sd_sampling = getattr(opts, 'sd_sampling', None)
+if _sd_sampling == "A1111":
     from k_diff.k_diffusion import sampling as _k_sampling
-elif opts.sd_sampling == "ldm patched (Comfy)":
+elif _sd_sampling == "ldm patched (Comfy)":
     from ldm_patched.k_diffusion import sampling as _k_sampling
 else:
-    _k_sampling = None  # no interception possible
+    # Forge Neo (and compatible forks): k_diffusion is on sys.path directly.
+    try:
+        import k_diffusion.sampling as _k_sampling
+    except ImportError:
+        _k_sampling = None  # no interception possible
 
 # ---------------------------------------------------------------------------
 # Sampler compatibility tables
@@ -466,6 +473,13 @@ class AdaptiveNoiseScaleScript(scripts.Script):
         state['original_func'] = original_func
         _state_ref          = state
         _p_ref              = p
+        _self_ref           = self
+
+        # reForge's ScriptRunner calls process_before_every_step automatically
+        # on every step during the production pass; Forge Neo has no such method
+        # so we must inject the per-step call ourselves into the callback.
+        _runner_has_step_cb = hasattr(getattr(_p_ref, 'scripts', None),
+                                      'process_before_every_step')
 
         def wrapped_func(*f_args, **f_kwargs):
             # f_args[0] = model, f_args[1] = x (sigma-scaled initial latent)
@@ -487,11 +501,12 @@ class AdaptiveNoiseScaleScript(scripts.Script):
                     return noise * s if s != 1.0 else noise
 
             # ── Calibration pass callback ─────────────────────────────────
+            # Call the script's step logic directly rather than routing through
+            # ScriptRunner — keeps the calibration pass self-contained and
+            # works on both reForge (has process_before_every_step) and
+            # Forge Neo (does not).
             def _cal_cb(d):
-                # Track denoised changes.
-                if _p_ref.scripts is not None:
-                    _p_ref.scripts.process_before_every_step(p=_p_ref, d=d)
-                # Abort once calibration completes.
+                _self_ref.process_before_every_step(p=_p_ref, d=d)
                 if _state_ref.get('calibrated'):
                     raise _CalibrationAbort()
 
@@ -528,9 +543,23 @@ class AdaptiveNoiseScaleScript(scripts.Script):
             # Rebuild f_args with x_initial in place of x.
             f_args_restart = (f_args[0], x_initial.to(x.device)) + f_args[2:]
 
-            prod_kw = dict(f_kwargs)  # original callback (includes process_before_every_step)
+            prod_kw = dict(f_kwargs)
             if raw_ns is not None:
                 prod_kw['noise_sampler'] = _scaled_ns  # closure reads scale dynamically
+
+            if not _runner_has_step_cb:
+                # Forge Neo: ScriptRunner won't call process_before_every_step,
+                # so wrap the original callback to inject our per-step tracking.
+                _orig_cb = f_kwargs.get('callback')
+
+                def _prod_cb(d):
+                    _self_ref.process_before_every_step(p=_p_ref, d=d)
+                    if _orig_cb is not None:
+                        _orig_cb(d)
+
+                prod_kw['callback'] = _prod_cb
+            # else: reForge — ScriptRunner drives process_before_every_step
+            # through the original callback automatically.
 
             return original_func(*f_args_restart, **prod_kw)
 
