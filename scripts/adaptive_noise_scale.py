@@ -73,8 +73,15 @@ else:
 # ---------------------------------------------------------------------------
 
 _SAMPLERS_NO_NOISE = frozenset({
-    'sample_dpmpp_2m',   # DPM++ 2M  — fully deterministic multistep ODE
-    'sample_lms',        # LMS       — linear multistep, no noise
+    'sample_dpmpp_2m',        # DPM++ 2M  — fully deterministic multistep ODE
+    'sample_lms',             # LMS       — linear multistep, no noise
+    'sample_dpmpp_2m_cfg_pp', # CFG++ variant of DPM++ 2M — same, no noise
+    # ODE adaptive solvers — pure deterministic ODEs, no noise injection
+    'sample_ode_bosh3',
+    'sample_ode_fehlberg2',
+    'sample_ode_adaptive_heun',
+    'sample_ode_dopri5',
+    'sample_ode_custom',
 })
 
 # SMEA samplers import torch directly (bypassing TorchHijack) and read
@@ -105,11 +112,75 @@ _SAMPLER_LABELS = {
     'sample_euler_smea_dy':   'Euler SMEA Dy',
     'sample_euler_negative':  'Euler Negative',
     'sample_euler_dy_negative': 'Euler Negative Dy',
+    # AlterSampler / ldm_patched exclusive function names
+    'sample_euler_ancestral_RF':               'Euler a RF',
+    'sample_ddpm':                             'DDPM',
+    'sample_heunpp2':                          'HeunPP2',
+    'sample_ipndm':                            'IPNDM',
+    'sample_ipndm_v':                          'IPNDM V',
+    'sample_deis':                             'DEIS',
+    'sample_euler_cfg_pp':                     'Euler CFG++',
+    'sample_euler_ancestral_cfg_pp':           'Euler a CFG++',
+    'sample_dpmpp_2s_ancestral_cfg_pp':        'DPM++ 2S a CFG++',
+    'sample_dpmpp_2s_ancestral_RF':            'DPM++ 2S a RF',
+    'sample_dpmpp_2s_ancestral_cfg_pp_dyn':    'DPM++ 2S a CFG++ Dyn',
+    'sample_dpmpp_2s_ancestral_cfg_pp_intern': 'DPM++ 2S a CFG++ Intern',
+    'sample_dpmpp_sde_cfg_pp':                 'DPM++ SDE CFG++',
+    'sample_dpmpp_2m_cfg_pp':                  'DPM++ 2M CFG++',
+    'sample_dpmpp_3m_sde_cfg_pp':              'DPM++ 3M SDE CFG++',
+    'sample_dpmpp_2m_dy':                      'DPM++ 2M DY',
+    'sample_dpmpp_3m_dy':                      'DPM++ 3M DY',
+    'sample_dpmpp_3m_sde_dy':                  'DPM++ 3M SDE DY',
+    'sample_euler_dy_cfg_pp':                  'Euler DY CFG++',
+    'sample_euler_smea_dy_cfg_pp':             'Euler SMEA DY CFG++',
+    'sample_euler_ancestral_dy_cfg_pp':        'Euler a DY CFG++',
+    'sample_dpmpp_2m_dy_cfg_pp':               'DPM++ 2M DY CFG++',
+    'sample_clyb_4m_sde_momentumized':         'CLYB 4M SDE',
+    'sample_res_solver':                       'RES Solver',
+    'sample_kohaku_lonyu_yog_cfg_pp':          'Kohaku LoNyu Yog CFG++',
+    'sample_custom':                           'Custom Sampler',
+    'sample_res_multistep':                    'RES Multistep',
+    'sample_res_multistep_cfg_pp':             'RES Multistep CFG++',
+    'sample_res_multistep_ancestral':          'RES Multistep Ancestral',
+    'sample_res_multistep_ancestral_cfg_pp':   'RES Multistep Ancestral CFG++',
+    'sample_gradient_estimation':              'Gradient Estimation',
+    'sample_gradient_estimation_cfg_pp':       'Gradient Estimation CFG++',
+    'sample_Kohaku_LoNyu_Yog':                 'Kohaku LoNyu Yog',
+    'sample_er_sde':                           'ER SDE',
+    'sample_seeds_2':                          'SEEDS 2',
+    'sample_seeds_3':                          'SEEDS 3',
+    'sample_sa_solver':                        'SA-Solver',
+    'sample_sa_solver_pece':                   'SA-Solver-Pece',
+    'sample_dpmpp_sde_classic':                'DPM++ SDE Classic',
+    'sample_exp_heun_2_x0':                    'EXP Heun 2 x0',
+    'sample_exp_heun_2_x0_sde':                'EXP Heun 2 x0 SDE',
+    # ODE sampler bound-method names (AlterSampler.sample_ode_*)
+    'sample_ode_bosh3':                        'ODE (Bosh3)',
+    'sample_ode_fehlberg2':                    'ODE (Fehlberg2)',
+    'sample_ode_adaptive_heun':                'ODE (Adaptive Heun)',
+    'sample_ode_dopri5':                       'ODE (Dopri5)',
+    'sample_ode_custom':                       'ODE Custom',
 }
 
-# Euler/Heun/DPM2 only inject noise when s_churn > 0 (default = 0).
+# These only inject noise when s_churn > 0 (default = 0 → deterministic).
 _SAMPLERS_STOCHASTIC_OPTIONAL = frozenset({
     'sample_euler', 'sample_heun', 'sample_dpm_2',
+    # DY/SMEA CFG++ variants also use s_churn for noise injection
+    'sample_euler_cfg_pp',
+    'sample_euler_dy_cfg_pp',
+    'sample_euler_smea_dy_cfg_pp',
+})
+
+# Samplers that create BrownianTreeNoiseSampler *internally* when no
+# noise_sampler kwarg is provided.  The standard registrations pass
+# noise_sampler via brownian_noise:True in SamplerData options, so ANS can
+# wrap it.  AlterSampler variants omit that option — noise bypasses ANS.
+_SAMPLERS_BROWNIAN_INTERNAL = frozenset({
+    'sample_dpmpp_sde',
+    'sample_dpmpp_2m_sde',
+    'sample_dpmpp_3m_sde',
+    'sample_dpmpp_sde_cfg_pp',
+    'sample_dpmpp_3m_sde_cfg_pp',
 })
 
 # ---------------------------------------------------------------------------
@@ -295,6 +366,21 @@ class AdaptiveNoiseScaleScript(scripts.Script):
                 f"[ANS] Note: '{label}' injects noise only when s_churn > 0.  "
                 "ANS is active but has no effect at the default s_churn = 0."
             )
+
+        if funcname in _SAMPLERS_BROWNIAN_INTERNAL:
+            has_brownian_kwarg = (
+                getattr(sampler, 'config', None) is not None
+                and sampler.config.options.get('brownian_noise', False)
+            )
+            if not has_brownian_kwarg:
+                print(
+                    f"[ANS] ⚠ Warning: '{label}' creates BrownianTree noise "
+                    "internally when noise_sampler is not passed as a kwarg. "
+                    "ANS correction cannot be applied. Use the standard sampler "
+                    "registration (which sets brownian_noise:True) instead of "
+                    "the AlterSampler/comfy variant."
+                )
+                return
 
         # ── Build mutable state dict (captured by closures) ──────────────
         state: dict = {
