@@ -28,13 +28,20 @@ Two-pass execution:
 
 ## Supported samplers
 
-Works with all standard k-diffusion samplers on both reForge and Forge Neo: Euler a, DPM++ SDE, DPM++ 2M SDE, DPM++ 3M SDE, DPM++ 2S a, DPM2 a, DPM fast, DPM adaptive, Euler A2, and others that inject noise.
+Works with all standard k-diffusion samplers on both reForge and Forge Neo, and AlterSampler-based stochastic samplers:
+
+**Standard samplers (always supported):**
+Euler a, Euler A2, DPM++ SDE, DPM++ 2M SDE, DPM++ 3M SDE, DPM++ 2S a, DPM2 a, DPM fast, DPM adaptive, and others that inject noise.
+
+**AlterSampler / ldm_patched samplers (supported):**
+ER SDE, SEEDS 2, SEEDS 3, SA-Solver, SA-Solver-Pece, RES Multistep Ancestral, RES Multistep Ancestral CFG++, Euler a CFG++, DPM++ 2S a CFG++, Euler a DY CFG++, DPM++ 3M SDE DY, EXP Heun 2 x0 SDE, CLYB 4M SDE, DDPM, and other stochastic samplers registered via `AlterSampler`.
 
 **Not supported (with warnings):**
-- **DPM++ 2M, LMS** — fully deterministic, no noise injection.
+- **DPM++ 2M, LMS, DPM++ 2M CFG++, ODE samplers** — fully deterministic, no noise injection.
 - **Euler Dy, Euler SMEA Dy, Euler Negative, Euler Negative Dy** — SMEA family bypasses the noise interception point.
+- **DPM++ SDE Comfy, DPM++ 2M SDE Comfy, DPM++ 3M SDE Comfy, DPM++ SDE CFG++, DPM++ 3M SDE CFG++** — AlterSampler variants that create BrownianTree noise internally (no `brownian_noise:True` option). Use the standard `DPM++ SDE / 2M SDE / 3M SDE` registrations instead.
 
-> **Note:** Euler, Heun, and DPM2 only inject noise when `s_churn > 0` (default is 0), so the extension is active but has no effect at default settings.
+> **Note:** Euler, Heun, DPM2, Euler CFG++, Euler DY CFG++, and Euler SMEA DY CFG++ only inject noise when `s_churn > 0` (default is 0), so the extension is active but has no effect at default settings.
 
 ## Installation
 
