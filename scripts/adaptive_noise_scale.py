@@ -162,6 +162,23 @@ def _get_phase_correction(sigma_val, bin_corrections, global_correction):
         return bin_corrections.get('cleanup', global_correction)
 
 
+def _resolve_funcname(sampler) -> 'str | None':
+    """
+    Return the sampler's function name as a string.
+
+    Standard KDiffusionSampler stores funcname as a string
+    (e.g. 'sample_euler_ancestral').  AlterSampler stores the callable
+    itself; we use __name__ to recover the string.
+    Returns None if the name cannot be determined.
+    """
+    fn = getattr(sampler, 'funcname', None)
+    if fn is None:
+        return None
+    if callable(fn):
+        return getattr(fn, '__name__', None)
+    return fn
+
+
 # ---------------------------------------------------------------------------
 # Main script class
 # ---------------------------------------------------------------------------
@@ -251,8 +268,8 @@ class AdaptiveNoiseScaleScript(scripts.Script):
         if sampler is None:
             return
 
-        funcname = getattr(sampler, 'funcname', None)
-        if funcname is None or callable(funcname):
+        funcname = _resolve_funcname(sampler)
+        if not funcname:
             print("[ANS] Cannot determine sampler type — ANS will not be applied.")
             return
 
